@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 2000 }
+          generationConfig: { temperature: 0.4, maxOutputTokens: 2000, ...(action === 'quiz' && { responseMimeType: 'application/json' }) }
         })
       }
     );
