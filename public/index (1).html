@@ -115,8 +115,9 @@ body {
 
 /* ─── LAYOUT ─── */
 .layout {
-  display: grid;
-  grid-template-columns: 1fr 380px;
+  display: block;
+  max-width: 760px;
+  margin: 0 auto;
   min-height: calc(100vh - 110px);
 }
 
@@ -701,9 +702,16 @@ footer .copy {
   <main class="main-col">
     <span class="section-flag">Загрузка материала</span>
     <h2 class="headline">Учись <em>умнее.</em><br>Не дольше.</h2>
-    <p class="deck">Загрузи учебный материал — конспект, учебник, фотографию страницы. Искусственный интеллект сделает краткое содержание или проверит твои знания.</p>
+    <p class="deck">Загрузи файл или фото, либо вставь текст вручную — ИИ сделает краткое содержание или проверит знания.</p>
 
-    <!-- UPLOAD -->
+    <!-- TABS -->
+    <div style="display:flex;border-bottom:2px solid var(--ink);margin-bottom:16px">
+      <button id="tabFile" onclick="switchTab('file')" style="font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:10px 20px;border:none;background:var(--ink);color:var(--paper);cursor:pointer">📎 Файл / Фото</button>
+      <button id="tabText" onclick="switchTab('text')" style="font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:10px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer">✏️ Вставить текст</button>
+    </div>
+
+    <!-- PANEL FILE -->
+    <div id="panelFile">
     <div class="upload-area" id="uploadArea">
       <input type="file" id="fileInput" accept=".txt,.pdf,.png,.jpg,.jpeg,.webp">
       <div class="upload-inner upload-placeholder">
@@ -723,6 +731,12 @@ footer .copy {
           <span class="file-name-text" id="fileName">—</span>
         </div>
       </div>
+    </div>
+    </div><!-- /panelFile -->
+
+    <!-- PANEL TEXT -->
+    <div id="panelText" style="display:none;margin-bottom:24px">
+      <textarea id="textInput" placeholder="Вставь сюда текст учебного материала — параграф, конспект, определения..." style="width:100%;min-height:180px;padding:16px;font-family:var(--sans);font-size:14px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);resize:vertical;outline:none;line-height:1.6"></textarea>
     </div>
 
     <!-- ACTIONS -->
@@ -761,61 +775,6 @@ footer .copy {
 
   </main>
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-
-    <div class="sidebar-block">
-      <div class="sidebar-label">О проекте</div>
-      <p class="sidebar-headline">Как это работает</p>
-      <ul class="tip-list">
-        <li>Загружаешь файл с учебным материалом</li>
-        <li>ИИ читает и анализирует содержание</li>
-        <li>Получаешь краткое содержание или тест</li>
-        <li>API ключ спрятан на сервере — безопасно</li>
-      </ul>
-    </div>
-
-    <div class="sidebar-block">
-      <div class="sidebar-label">Форматы файлов</div>
-      <p class="sidebar-body">Поддерживаются все основные форматы учебных материалов:</p>
-      <div class="formats">
-        <span class="format-tag">PDF</span>
-        <span class="format-tag">JPG</span>
-        <span class="format-tag">PNG</span>
-        <span class="format-tag">WEBP</span>
-        <span class="format-tag">TXT</span>
-      </div>
-    </div>
-
-    <div class="sidebar-block">
-      <div class="sidebar-label">Лимиты API</div>
-      <div class="stat-grid">
-        <div class="stat-cell">
-          <div class="num">15</div>
-          <div class="lbl">запросов/мин</div>
-        </div>
-        <div class="stat-cell">
-          <div class="num">250</div>
-          <div class="lbl">запросов/день</div>
-        </div>
-        <div class="stat-cell" style="grid-column:span 2">
-          <div class="num" style="font-size:20px">Бесплатно</div>
-          <div class="lbl">Gemini 2.0 Flash · навсегда</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="sidebar-block">
-      <div class="sidebar-label">Деплой</div>
-      <p class="sidebar-body" style="margin-bottom:8px">
-        GitHub + Vercel. API ключ в переменных окружения — пользователи не видят.
-      </p>
-      <p class="sidebar-body">
-        Ключ: <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a>
-      </p>
-    </div>
-
-  </aside>
 </div>
 
 <!-- FOOTER -->
@@ -825,24 +784,47 @@ footer .copy {
 </footer>
 
 <script>
-const uploadArea = document.getElementById('uploadArea');
-const fileInput  = document.getElementById('fileInput');
-const fileName   = document.getElementById('fileName');
-const removeBtn  = document.getElementById('removeBtn');
-const btnSummary = document.getElementById('btnSummary');
-const btnQuiz    = document.getElementById('btnQuiz');
-const loading    = document.getElementById('loading');
-const loadingLabel = document.getElementById('loadingLabel');
-const errorBar   = document.getElementById('errorBar');
+const uploadArea  = document.getElementById('uploadArea');
+const fileInput   = document.getElementById('fileInput');
+const fileName    = document.getElementById('fileName');
+const removeBtn   = document.getElementById('removeBtn');
+const textInput   = document.getElementById('textInput');
+const btnSummary  = document.getElementById('btnSummary');
+const btnQuiz     = document.getElementById('btnQuiz');
+const loading     = document.getElementById('loading');
+const loadingLabel= document.getElementById('loadingLabel');
+const errorBar    = document.getElementById('errorBar');
 const resultSection = document.getElementById('resultSection');
-const resultType = document.getElementById('resultType');
+const resultType  = document.getElementById('resultType');
 const resultHeadline = document.getElementById('resultHeadline');
-const resultBody = document.getElementById('resultBody');
+const resultBody  = document.getElementById('resultBody');
 
 let currentFile = null;
+let activeTab = 'file';
 let quizData = null;
 let answered = new Set();
 let correct = 0;
+
+// ── Tabs ──
+window.switchTab = function(tab) {
+  activeTab = tab;
+  document.getElementById('panelFile').style.display = tab === 'file' ? 'block' : 'none';
+  document.getElementById('panelText').style.display = tab === 'text' ? 'block' : 'none';
+  document.getElementById('tabFile').style.background = tab === 'file' ? 'var(--ink)' : 'transparent';
+  document.getElementById('tabFile').style.color = tab === 'file' ? 'var(--paper)' : 'var(--muted)';
+  document.getElementById('tabText').style.background = tab === 'text' ? 'var(--ink)' : 'transparent';
+  document.getElementById('tabText').style.color = tab === 'text' ? 'var(--paper)' : 'var(--muted)';
+  updateBtns();
+};
+
+function updateBtns() {
+  const hasFile = activeTab === 'file' && currentFile;
+  const hasText = activeTab === 'text' && textInput.value.trim().length > 10;
+  btnSummary.disabled = !(hasFile || hasText);
+  btnQuiz.disabled    = !(hasFile || hasText);
+}
+
+textInput.addEventListener('input', updateBtns);
 
 // ── Upload ──
 uploadArea.addEventListener('click', e => {
@@ -852,7 +834,6 @@ uploadArea.addEventListener('click', e => {
 ['dragover','dragenter'].forEach(ev => uploadArea.addEventListener(ev, e => {
   e.preventDefault(); uploadArea.classList.add('drag-over');
 }));
-
 ['dragleave','drop'].forEach(ev => uploadArea.addEventListener(ev, () => {
   uploadArea.classList.remove('drag-over');
 }));
@@ -861,18 +842,15 @@ uploadArea.addEventListener('drop', e => {
   e.preventDefault();
   if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
 });
-
 fileInput.addEventListener('change', () => {
   if (fileInput.files[0]) setFile(fileInput.files[0]);
 });
-
 removeBtn.addEventListener('click', e => {
   e.stopPropagation();
   currentFile = null;
   fileInput.value = '';
   uploadArea.classList.remove('has-file');
-  btnSummary.disabled = true;
-  btnQuiz.disabled = true;
+  updateBtns();
   clearResult();
 });
 
@@ -880,13 +858,12 @@ function setFile(f) {
   currentFile = f;
   fileName.textContent = f.name + ' (' + fmt(f.size) + ')';
   uploadArea.classList.add('has-file');
-  btnSummary.disabled = false;
-  btnQuiz.disabled = false;
+  updateBtns();
   clearResult();
 }
 
 function fmt(b) {
-  return b < 1024*1024 ? (b/1024).toFixed(1)+'КБ' : (b/(1024*1024)).toFixed(1)+'МБ';
+  return b < 1024*1024 ? (b/1024).toFixed(1)+' КБ' : (b/(1024*1024)).toFixed(1)+' МБ';
 }
 
 // ── Helpers ──
@@ -895,52 +872,49 @@ function clearResult() {
   errorBar.classList.remove('on');
   quizData = null; answered.clear(); correct = 0;
 }
-
 function showError(msg) {
   errorBar.textContent = msg;
   errorBar.classList.add('on');
 }
-
 function setLoading(on, msg = '') {
   loading.classList.toggle('on', on);
   loadingLabel.textContent = msg;
 }
-
-function setBtns(dis) {
+function setAllBtns(dis) {
   btnSummary.disabled = dis;
-  btnQuiz.disabled = dis;
+  btnQuiz.disabled    = dis;
 }
 
-async function readFile() {
-  return new Promise((res, rej) => {
+async function buildBody(action) {
+  if (activeTab === 'text') {
+    return { action, text: textInput.value.trim() };
+  }
+  // file tab
+  return new Promise((resolve, reject) => {
     const r = new FileReader();
     const isImg = currentFile.type.startsWith('image/');
     const isPdf = currentFile.type === 'application/pdf';
     if (isImg || isPdf) {
-      r.onload = () => res({ b64: r.result.split(',')[1], mime: currentFile.type });
+      r.onload = () => resolve({ action, fileBase64: r.result.split(',')[1], mimeType: currentFile.type });
       r.readAsDataURL(currentFile);
     } else {
-      r.onload = () => res({ text: r.result });
+      r.onload = () => resolve({ action, text: r.result });
       r.readAsText(currentFile);
     }
-    r.onerror = rej;
+    r.onerror = reject;
   });
 }
 
 async function callAPI(action) {
   clearResult();
-  setBtns(true);
-
-  const label = action === 'summary' ? 'Составляю краткое содержание...' : 'Генерирую викторину...';
-  setLoading(true, label);
+  setAllBtns(true);
+  setLoading(true, action === 'summary' ? 'Составляю краткое содержание...' : 'Генерирую викторину...');
 
   let body;
   try {
-    const fc = await readFile();
-    body = { action, ...fc };
+    body = await buildBody(action);
   } catch(e) {
-    setLoading(false);
-    setBtns(false);
+    setLoading(false); setAllBtns(false);
     return showError('Ошибка чтения файла: ' + e.message);
   }
 
@@ -950,27 +924,21 @@ async function callAPI(action) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-
     const data = await resp.json();
     setLoading(false);
-
-    if (!resp.ok || data.error) {
-      return showError('Ошибка: ' + (data.error || resp.status));
-    }
-
+    if (!resp.ok || data.error) return showError('Ошибка: ' + (data.error || resp.status));
     if (action === 'summary') renderSummary(data.result);
     else renderQuiz(data.result);
-
   } catch(e) {
     setLoading(false);
     showError('Ошибка сети: ' + e.message);
   }
 
-  setBtns(false);
+  updateBtns();
 }
 
 btnSummary.addEventListener('click', () => callAPI('summary'));
-btnQuiz.addEventListener('click', () => callAPI('quiz'));
+btnQuiz.addEventListener('click',    () => callAPI('quiz'));
 
 // ── Render Summary ──
 function renderSummary(text) {
