@@ -48,27 +48,50 @@ export default async function handler(req, res) {
   const generationConfig = { temperature: 0.4, maxOutputTokens: 2000 };
   if (isQuiz) generationConfig.responseMimeType = 'application/json';
 
-  try {
+  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+
+  async function callGemini(model) {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts }], generationConfig })
       }
     );
-
     const data = await response.json();
+    return { ok: response.ok, status: response.status, data };
+  }
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || 'Gemini API error' });
+  try {
+    let result = null;
+    let lastError = null;
+
+    for (const model of models) {
+      const { ok, status, data } = await callGemini(model);
+
+      if (ok) {
+        result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (isQuiz) {
+          const match = result.match(/\{[\s\S]*\}/);
+          if (match) result = match[0];
+        }
+        break;
+      }
+
+      const errMsg = data.error?.message || '';
+      const isOverloaded = status === 503 || errMsg.includes('high demand') || errMsg.includes('overloaded');
+
+      if (isOverloaded) {
+        lastError = errMsg;
+        continue;
+      }
+
+      return res.status(status).json({ error: errMsg || 'Gemini API error' });
     }
 
-    let result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    if (isQuiz) {
-      const match = result.match(/\{[\s\S]*\}/);
-      if (match) result = match[0];
+    if (result === null) {
+      return res.status(503).json({ error: 'Все модели перегружены, попробуй через минуту.' });
     }
 
     res.status(200).json({ result });
