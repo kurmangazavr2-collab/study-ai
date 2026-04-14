@@ -45,18 +45,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Предоставь текст или загрузи файл' });
   }
 
-  const generationConfig = { temperature: 0.4, maxOutputTokens: 2000 };
-  if (isQuiz) generationConfig.responseMimeType = 'application/json';
-
   const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
 
   async function callGemini(model) {
+    const config = { temperature: 0.4, maxOutputTokens: 2000 };
+    if (isQuiz && model === 'gemini-2.5-flash') config.responseMimeType = 'application/json';
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig })
+        body: JSON.stringify({ contents: [{ parts }], generationConfig: config })
       }
     );
     const data = await response.json();
@@ -73,6 +73,7 @@ export default async function handler(req, res) {
       if (ok) {
         result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         if (isQuiz) {
+          result = result.replace(/```json|```/g, '').trim();
           const match = result.match(/\{[\s\S]*\}/);
           if (match) result = match[0];
         }
